@@ -1,0 +1,12 @@
+{
+  "name": "daily-widget",
+  "version": "1.0.0",
+  "description": "Daily widget (calendar + tasks + pomodoro) as a desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}
