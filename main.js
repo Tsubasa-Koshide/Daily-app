@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Notification } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -162,11 +162,28 @@ async function notionDetectSchema(token, dbId) {
   const doneProp = (checkbox.find(([n]) => /done|complete|finish|完了|済/i.test(n)) || checkbox[0] || [])[0] || null;
   const dates = entries.filter(([, d]) => d.type === 'date');
   const dueProp = (dates.find(([n]) => /due|date|期限|締切|期日|日付/i.test(n)) || dates[0] || [])[0] || null;
-  const selects = entries.filter(([, d]) => d.type === 'select');
-  const priEntry = selects.find(([n]) => /pri|優先|重要/i.test(n)) || selects[0];
-  let priProp = null, priOptions = [];
-  if (priEntry) { priProp = priEntry[0]; priOptions = ((priEntry[1].select && priEntry[1].select.options) || []).map((o) => o.name); }
-  return { titleProp, doneProp, dueProp, priProp, priOptions };
+  const priCandidates = entries.filter(([, d]) => ['select', 'multi_select', 'status'].includes(d.type));
+  const priEntry = priCandidates.find(([n]) => /pri|優先|重要|tag|タグ|status|ステータス/i.test(n)) || priCandidates[0];
+  let priProp = null, priType = null, priOptions = [];
+  if (priEntry) {
+    priProp = priEntry[0];
+    priType = priEntry[1].type;
+    const def = priEntry[1][priType];
+    priOptions = ((def && def.options) || []).map((o) => o.name);
+  }
+  return { v: 2, titleProp, doneProp, dueProp, priProp, priType, priOptions };
+}
+
+async function ensureNotion() {
+  const c = loadConfig();
+  const n = c.notion;
+  if (!n) return null;
+  if (!n.schema || n.schema.v !== 2) {
+    n.schema = await notionDetectSchema(n.token, n.databaseId);
+    c.notion = n;
+    saveConfig(c);
+  }
+  return n;
 }
 
 function priBucket(name) {
@@ -176,10 +193,14 @@ function priBucket(name) {
   if (/low|低/.test(n)) return 'low';
   return 'mid';
 }
+function priLabel(bucket) { return ({ high: 'High', mid: 'Mid', low: 'Low' })[bucket] || 'Mid'; }
 function priOptionFor(bucket, options) {
-  if (!options || !options.length) return null;
-  const re = { high: /high|urgent|高|重要/i, mid: /mid|med|中|normal|普通/i, low: /low|低/i }[bucket];
-  return options.find((o) => re.test(o)) || null;
+  if (options && options.length) {
+    const re = ({ high: /high|urgent|高|重要/i, mid: /mid|med|中|normal|普通/i, low: /low|低/i })[bucket];
+    const m = options.find((o) => re.test(o));
+    if (m) return m;
+  }
+  return priLabel(bucket);
 }
 
 ipcMain.handle('notion:save', async (e, { token, databaseId }) => {
@@ -201,7 +222,7 @@ ipcMain.handle('notion:disconnect', () => {
 
 ipcMain.handle('tasks:list', async () => {
   try {
-    const n = loadConfig().notion;
+    const n = await ensureNotion();
     if (!n) return { ok: false, error: 'not connected', tasks: [] };
     const res = await fetch('https://api.notion.com/v1/databases/' + n.databaseId + '/query', {
       method: 'POST', headers: notionHeaders(n.token), body: JSON.stringify({ page_size: 100 })
@@ -215,7 +236,13 @@ ipcMain.handle('tasks:list', async () => {
       const name = titleArr.map((t) => t.plain_text).join('') || '(無題)';
       const done = !!(s.doneProp && props[s.doneProp] && props[s.doneProp].checkbox);
       const due = (s.dueProp && props[s.dueProp] && props[s.dueProp].date && props[s.dueProp].date.start) || null;
-      const priName = (s.priProp && props[s.priProp] && props[s.priProp].select && props[s.priProp].select.name) || null;
+      let priName = null;
+      if (s.priProp && props[s.priProp]) {
+        const v = props[s.priProp];
+        if (s.priType === 'status') priName = v.status && v.status.name;
+        else if (s.priType === 'multi_select') priName = v.multi_select && v.multi_select[0] && v.multi_select[0].name;
+        else priName = v.select && v.select.name;
+      }
       return { id: p.id, name, done, due, pri: priBucket(priName) };
     });
     return { ok: true, tasks };
@@ -224,14 +251,23 @@ ipcMain.handle('tasks:list', async () => {
 
 ipcMain.handle('tasks:add', async (e, { name, pri, due }) => {
   try {
-    const n = loadConfig().notion;
+    const n = await ensureNotion();
     if (!n) return { ok: false, error: 'not connected' };
     const s = n.schema;
     const properties = {};
     properties[s.titleProp] = { title: [{ text: { content: name } }] };
     if (s.doneProp) properties[s.doneProp] = { checkbox: false };
     if (s.dueProp && due) properties[s.dueProp] = { date: { start: due } };
-    if (s.priProp) { const opt = priOptionFor(pri, s.priOptions); if (opt) properties[s.priProp] = { select: { name: opt } }; }
+    if (s.priProp) {
+      const label = priOptionFor(pri, s.priOptions);
+      if (s.priType === 'status') {
+        if (s.priOptions.includes(label)) properties[s.priProp] = { status: { name: label } };
+      } else if (s.priType === 'multi_select') {
+        properties[s.priProp] = { multi_select: [{ name: label }] };
+      } else {
+        properties[s.priProp] = { select: { name: label } };
+      }
+    }
     const res = await fetch('https://api.notion.com/v1/pages', {
       method: 'POST', headers: notionHeaders(n.token),
       body: JSON.stringify({ parent: { database_id: n.databaseId }, properties })
@@ -268,6 +304,13 @@ ipcMain.handle('tasks:delete', async (e, { id }) => {
     if (!res.ok) return { ok: false, error: (data && data.message) || 'delete failed' };
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e.message || e) }; }
+});
+
+ipcMain.handle('notify', (e, { title, body }) => {
+  try {
+    if (Notification.isSupported()) new Notification({ title: title || 'Daily Widget', body: body || '' }).show();
+    return { ok: true };
+  } catch (err) { return { ok: false, error: String(err.message || err) }; }
 });
 
 ipcMain.handle('config:status', () => {
@@ -336,6 +379,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(() => {
+    if (process.platform === 'win32') app.setAppUserModelId('com.dailywidget.app');
     createWindow();
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

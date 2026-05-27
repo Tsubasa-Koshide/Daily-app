@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   configStatus: () => ipcRenderer.invoke('config:status'),
+  notify: (title, body) => ipcRenderer.invoke('notify', { title, body }),
 
   googleSaveCreds: (clientId, clientSecret, calendarId) =>
     ipcRenderer.invoke('google:saveCreds', { clientId, clientSecret, calendarId }),
