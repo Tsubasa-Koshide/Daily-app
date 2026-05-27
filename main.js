@@ -158,12 +158,31 @@ async function notionDetectSchema(token, dbId) {
   const entries = Object.entries(data.properties || {});
   let titleProp = null;
   for (const [name, def] of entries) if (def.type === 'title') titleProp = name;
+
+  // "done" state: prefer a checkbox; otherwise use a status property.
+  let doneProp = null, doneType = null, doneDoneOption = null, doneTodoOption = null;
   const checkbox = entries.filter(([, d]) => d.type === 'checkbox');
-  const doneProp = (checkbox.find(([n]) => /done|complete|finish|完了|済/i.test(n)) || checkbox[0] || [])[0] || null;
+  if (checkbox.length) {
+    doneProp = (checkbox.find(([n]) => /done|complete|finish|完了|済/i.test(n)) || checkbox[0])[0];
+    doneType = 'checkbox';
+  } else {
+    const statuses = entries.filter(([, d]) => d.type === 'status');
+    const st = statuses.find(([n]) => /status|done|complete|完了|状態|ステータス|進捗/i.test(n)) || statuses[0];
+    if (st) {
+      doneProp = st[0];
+      doneType = 'status';
+      const opts = ((st[1].status && st[1].status.options) || []).map((o) => o.name);
+      doneDoneOption = opts.find((o) => /done|complete|完了|済|finished/i.test(o)) || opts[opts.length - 1] || null;
+      doneTodoOption = opts.find((o) => /to.?do|not started|未着手|未対応|backlog|未/i.test(o)) || opts[0] || null;
+    }
+  }
+
   const dates = entries.filter(([, d]) => d.type === 'date');
   const dueProp = (dates.find(([n]) => /due|date|期限|締切|期日|日付/i.test(n)) || dates[0] || [])[0] || null;
-  const priCandidates = entries.filter(([, d]) => ['select', 'multi_select', 'status'].includes(d.type));
-  const priEntry = priCandidates.find(([n]) => /pri|優先|重要|tag|タグ|status|ステータス/i.test(n)) || priCandidates[0];
+
+  // priority/tag: a select or multi_select (status is reserved for "done").
+  const priCandidates = entries.filter(([, d]) => ['select', 'multi_select'].includes(d.type));
+  const priEntry = priCandidates.find(([n]) => /pri|優先|重要|tag|タグ/i.test(n)) || priCandidates[0];
   let priProp = null, priType = null, priOptions = [];
   if (priEntry) {
     priProp = priEntry[0];
@@ -171,14 +190,15 @@ async function notionDetectSchema(token, dbId) {
     const def = priEntry[1][priType];
     priOptions = ((def && def.options) || []).map((o) => o.name);
   }
-  return { v: 2, titleProp, doneProp, dueProp, priProp, priType, priOptions };
+
+  return { v: 3, titleProp, doneProp, doneType, doneDoneOption, doneTodoOption, dueProp, priProp, priType, priOptions };
 }
 
 async function ensureNotion() {
   const c = loadConfig();
   const n = c.notion;
   if (!n) return null;
-  if (!n.schema || n.schema.v !== 2) {
+  if (!n.schema || n.schema.v !== 3) {
     n.schema = await notionDetectSchema(n.token, n.databaseId);
     c.notion = n;
     saveConfig(c);
@@ -234,13 +254,21 @@ ipcMain.handle('tasks:list', async () => {
       const props = p.properties || {};
       const titleArr = (s.titleProp && props[s.titleProp] && props[s.titleProp].title) || [];
       const name = titleArr.map((t) => t.plain_text).join('') || '(無題)';
-      const done = !!(s.doneProp && props[s.doneProp] && props[s.doneProp].checkbox);
+      let done = false;
+      if (s.doneProp && props[s.doneProp]) {
+        const dv = props[s.doneProp];
+        if (s.doneType === 'status') {
+          const cur = dv.status && dv.status.name;
+          done = !!cur && (cur === s.doneDoneOption || /done|complete|完了|済|finished/i.test(cur));
+        } else {
+          done = !!dv.checkbox;
+        }
+      }
       const due = (s.dueProp && props[s.dueProp] && props[s.dueProp].date && props[s.dueProp].date.start) || null;
       let priName = null;
       if (s.priProp && props[s.priProp]) {
         const v = props[s.priProp];
-        if (s.priType === 'status') priName = v.status && v.status.name;
-        else if (s.priType === 'multi_select') priName = v.multi_select && v.multi_select[0] && v.multi_select[0].name;
+        if (s.priType === 'multi_select') priName = v.multi_select && v.multi_select[0] && v.multi_select[0].name;
         else priName = v.select && v.select.name;
       }
       return { id: p.id, name, done, due, pri: priBucket(priName) };
@@ -256,7 +284,10 @@ ipcMain.handle('tasks:add', async (e, { name, pri, due }) => {
     const s = n.schema;
     const properties = {};
     properties[s.titleProp] = { title: [{ text: { content: name } }] };
-    if (s.doneProp) properties[s.doneProp] = { checkbox: false };
+    if (s.doneProp) {
+      if (s.doneType === 'status') { if (s.doneTodoOption) properties[s.doneProp] = { status: { name: s.doneTodoOption } }; }
+      else properties[s.doneProp] = { checkbox: false };
+    }
     if (s.dueProp && due) properties[s.dueProp] = { date: { start: due } };
     if (s.priProp) {
       const label = priOptionFor(pri, s.priOptions);
@@ -280,10 +311,18 @@ ipcMain.handle('tasks:add', async (e, { name, pri, due }) => {
 
 ipcMain.handle('tasks:toggle', async (e, { id, done }) => {
   try {
-    const n = loadConfig().notion;
+    const n = await ensureNotion();
     if (!n) return { ok: false, error: 'not connected' };
-    if (!n.schema.doneProp) return { ok: false, error: 'チェックボックス列がありません' };
-    const properties = {}; properties[n.schema.doneProp] = { checkbox: !!done };
+    const s = n.schema;
+    if (!s.doneProp) return { ok: false, error: '完了用の列が見つかりません。Notionに「チェックボックス」または「ステータス」列を追加してください' };
+    const properties = {};
+    if (s.doneType === 'status') {
+      const name = done ? s.doneDoneOption : s.doneTodoOption;
+      if (!name) return { ok: false, error: 'ステータスの選択肢（完了/未着手）が見つかりません' };
+      properties[s.doneProp] = { status: { name } };
+    } else {
+      properties[s.doneProp] = { checkbox: !!done };
+    }
     const res = await fetch('https://api.notion.com/v1/pages/' + id, {
       method: 'PATCH', headers: notionHeaders(n.token), body: JSON.stringify({ properties })
     });
