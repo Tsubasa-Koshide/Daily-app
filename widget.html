@@ -118,6 +118,34 @@ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:c
 .psb:hover{opacity:.8;}
 .prb{font-family:'Silkscreen',monospace;font-size:9px;padding:7px 14px;border-radius:10px;border:1px solid var(--br);background:rgba(255,255,255,.7);color:var(--mu);cursor:pointer;transition:all .12s;letter-spacing:.04em;}
 .prb:hover{background:rgba(255,255,255,.95);color:var(--bark);}
+/* add-event */
+.edate-row{display:flex;align-items:center;justify-content:space-between;}
+.mini-add{width:18px;height:18px;border-radius:6px;border:1px solid var(--br);background:rgba(255,255,255,.6);color:var(--mu);cursor:pointer;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center;font-family:sans-serif;}
+.mini-add:hover{background:rgba(255,255,255,.95);color:var(--bark);}
+.evform{display:flex;gap:4px;margin:4px 0 2px;flex-wrap:wrap;}
+.evform input{background:rgba(255,255,255,.7);border:1px solid var(--br);border-radius:8px;color:var(--bark);font-family:'DM Mono',monospace;font-size:9px;padding:6px 8px;outline:none;}
+.evform input#evTitle{flex:1;min-width:90px;font-family:'Silkscreen',monospace;}
+.evform input[type=time]{width:74px;}
+.evform button{background:var(--bark);color:var(--lima);border:none;border-radius:8px;font-family:'Silkscreen',monospace;font-size:9px;padding:0 11px;cursor:pointer;}
+/* settings */
+.settings-overlay{position:fixed;inset:0;background:rgba(40,38,34,.45);display:none;align-items:center;justify-content:center;z-index:200;padding:18px;}
+.settings-box{background:var(--bg);border:1px solid var(--br2);border-radius:16px;width:380px;max-width:100%;max-height:92vh;overflow-y:auto;padding:18px;box-shadow:0 8px 40px rgba(0,0,0,.25);color:var(--bark);}
+.settings-head{display:flex;align-items:center;justify-content:space-between;font-family:'Silkscreen',monospace;font-size:12px;letter-spacing:.1em;margin-bottom:12px;}
+.settings-head button{background:none;border:none;font-size:18px;cursor:pointer;color:var(--mu);font-family:sans-serif;line-height:1;}
+.settings-sec{border:1px solid var(--br);border-radius:12px;padding:12px;margin-bottom:12px;background:rgba(255,255,255,.5);}
+.settings-title{font-family:'Silkscreen',monospace;font-size:10px;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:7px;}
+.settings-stat{font-family:'DM Mono',monospace;font-size:8px;padding:2px 8px;border-radius:999px;border:1px solid var(--br);color:var(--mu);}
+.settings-stat.ok{background:var(--lima);color:var(--bark);border-color:var(--bark);}
+.settings-box input{width:100%;background:#fff;border:1px solid var(--br);border-radius:8px;color:var(--bark);font-family:'DM Mono',monospace;font-size:10px;padding:8px 10px;outline:none;margin-bottom:6px;}
+.settings-row{display:flex;gap:6px;}
+.settings-row button{flex:1;font-family:'Silkscreen',monospace;font-size:9px;padding:8px;border-radius:8px;border:none;cursor:pointer;letter-spacing:.04em;}
+.settings-row .primary{background:var(--bark);color:var(--lima);}
+.settings-row .ghost{background:rgba(0,0,0,.06);color:var(--mu);}
+.settings-hint{font-family:'DM Mono',monospace;font-size:8px;line-height:1.7;color:var(--mu);margin-top:8px;}
+.settings-hint a{color:#4285F4;}
+.settings-hint code{background:rgba(0,0,0,.06);padding:1px 4px;border-radius:4px;}
+#settings-msg{font-family:'DM Mono',monospace;font-size:9px;min-height:14px;color:var(--bark);}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bark);color:#fff;font-family:'DM Mono',monospace;font-size:10px;padding:9px 16px;border-radius:10px;z-index:300;display:none;max-width:90%;box-shadow:0 4px 20px rgba(0,0,0,.3);}
 </style>
 </head>
 <body>
@@ -127,7 +155,7 @@ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:c
       <span class="ptag" id="ltitle">· CALENDAR</span>
       <div class="hbts">
         <button class="ib" id="ptoggle" onclick="togglePom()" title="ポモドーロ" style="font-size:13px;">◷</button>
-        <button class="ib" style="font-size:11px;letter-spacing:.05em;">···</button>
+        <button class="ib" onclick="openSettings()" title="設定・同期" style="font-size:11px;letter-spacing:.05em;">···</button>
       </div>
     </div>
     <div id="calbody" style="display:contents;">
@@ -151,9 +179,18 @@ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:c
         </div>
         <div style="margin-top:6px;"><div class="cg" id="cg"></div></div>
       </div>
-      <div class="esec"><div class="edate" id="edate"></div><div id="elist"></div></div>
+      <div class="esec">
+        <div class="edate-row"><div class="edate" id="edate"></div><button class="mini-add" id="addEvBtn" onclick="toggleAddEv()" title="予定を追加" style="display:none;">+</button></div>
+        <div class="evform" id="evForm" style="display:none;">
+          <input id="evTitle" placeholder="予定名" onkeydown="if(event.key==='Enter')submitEvent()"/>
+          <input id="evStart" type="time"/>
+          <input id="evEnd" type="time"/>
+          <button onclick="submitEvent()">追加</button>
+        </div>
+        <div id="elist"></div>
+      </div>
       <div class="connect-row">
-        <button class="connect-btn"><span style="font-weight:700;color:#4285F4;font-family:sans-serif;font-size:10px;">G</span>&nbsp;Google Calendar&nbsp;<span style="opacity:.5;">→</span></button>
+        <button class="connect-btn" onclick="openSettings()"><span style="font-weight:700;color:#4285F4;font-family:sans-serif;font-size:10px;">G</span>&nbsp;<span id="gConnLabel">Google Calendar</span>&nbsp;<span style="opacity:.5;">→</span></button>
       </div>
     </div>
     <div id="pom-content">
@@ -212,17 +249,64 @@ body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:c
       </div>
     </div>
     <div class="bottom-connect">
-      <button class="bc-btn"><span style="font-weight:700;font-family:sans-serif;font-size:10px;">N</span>&nbsp;Notion&nbsp;<span style="opacity:.5">→</span></button>
-      <button class="bc-btn"><span style="font-weight:700;color:#4285F4;font-family:sans-serif;font-size:10px;">G</span>&nbsp;Calendar&nbsp;<span style="opacity:.5">→</span></button>
+      <button class="bc-btn" onclick="openSettings()"><span style="font-weight:700;font-family:sans-serif;font-size:10px;">N</span>&nbsp;<span id="nConnLabel">Notion</span>&nbsp;<span style="opacity:.5">→</span></button>
+      <button class="bc-btn" onclick="openSettings()"><span style="font-weight:700;color:#4285F4;font-family:sans-serif;font-size:10px;">G</span>&nbsp;Calendar&nbsp;<span style="opacity:.5">→</span></button>
     </div>
   </div>
 </div>
+
+<div class="settings-overlay" id="settings">
+  <div class="settings-box">
+    <div class="settings-head"><span>· SETTINGS / SYNC</span><button onclick="closeSettings()">×</button></div>
+
+    <div class="settings-sec">
+      <div class="settings-title"><span style="color:#4285F4;font-family:sans-serif;">G</span> Google Calendar <span class="settings-stat" id="gStat">未接続</span></div>
+      <input id="gClientId" placeholder="Client ID"/>
+      <input id="gClientSecret" placeholder="Client Secret" type="password"/>
+      <input id="gCalId" placeholder="Calendar ID（空欄なら primary）"/>
+      <div class="settings-row">
+        <button class="primary" onclick="gConnect()">接続する</button>
+        <button class="ghost" onclick="gDisconnect()">解除</button>
+      </div>
+      <div class="settings-hint">
+        取得手順:<br>
+        1. <code>console.cloud.google.com</code> でプロジェクト作成<br>
+        2. 「APIとサービス」→ Google Calendar API を有効化<br>
+        3. 「OAuth同意画面」を設定（テストユーザーに自分を追加）<br>
+        4. 「認証情報」→ OAuthクライアントID →「デスクトップアプリ」を作成<br>
+        5. 出てきた Client ID / Secret を上に貼り「接続する」
+      </div>
+    </div>
+
+    <div class="settings-sec">
+      <div class="settings-title"><span style="font-family:sans-serif;">N</span> Notion <span class="settings-stat" id="nStat">未接続</span></div>
+      <input id="nToken" placeholder="Integration Token（ntn_... / secret_...）" type="password"/>
+      <input id="nDbId" placeholder="Database ID"/>
+      <div class="settings-row">
+        <button class="primary" onclick="nSave()">保存して接続</button>
+        <button class="ghost" onclick="nDisconnect()">解除</button>
+      </div>
+      <div class="settings-hint">
+        取得手順:<br>
+        1. <code>notion.so/my-integrations</code> で「New integration」作成 → Token をコピー<br>
+        2. 同期したいタスクDBを開く →「···」→「コネクト」で作ったインテグレーションを追加<br>
+        3. DBページのURL内の32文字（<code>?v=</code>の前）が Database ID<br>
+        ※ タイトル列＋チェックボックス列があると最適です
+      </div>
+    </div>
+
+    <div id="settings-msg"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
 <script>
 var svg=document.getElementById('tsv');
 for(var i=0;i<60;i++){var maj=i%5===0,r=(i/60)*Math.PI*2-Math.PI/2,r1=maj?29:31,r2=37,l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',40+Math.cos(r)*r1);l.setAttribute('y1',40+Math.sin(r)*r1);l.setAttribute('x2',40+Math.cos(r)*r2);l.setAttribute('y2',40+Math.sin(r)*r2);l.setAttribute('stroke',maj?'#9A9088':'#D6D6D6');l.setAttribute('stroke-width',maj?'1.5':'0.8');svg.appendChild(l);}
 function tickClock(){var n=new Date(),h=n.getHours(),m=n.getMinutes(),s=n.getSeconds();document.getElementById('hH').style.transform='rotate('+(h%12/12*360+m/60*30)+'deg)';document.getElementById('hM').style.transform='rotate('+(m/60*360+s/60*6)+'deg)';document.getElementById('hS').style.transform='rotate('+(s/60*360)+'deg)';var D=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];document.getElementById('dday').textContent=String(n.getDate()).padStart(2,'0')+'. '+String(n.getMonth()+1).padStart(2,'0');document.getElementById('dwk').textContent=D[n.getDay()]+' / '+M[n.getMonth()];document.getElementById('dlive').textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
 tickClock();setInterval(tickClock,1000);
 var nd=new Date(),vy=nd.getFullYear(),vm=nd.getMonth(),sd=nd.getDate(),cf2='all',cp='high';
+var googleOn=false,notionOn=false;
 function fk(y,m,d){return new Date(y,m,d).getFullYear()+'-'+String(new Date(y,m,d).getMonth()).padStart(2,'0')+'-'+String(new Date(y,m,d).getDate()).padStart(2,'0');}
 function td(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0];}
 var evs={};
@@ -231,15 +315,16 @@ evs[fk(nd.getFullYear(),nd.getMonth(),nd.getDate()+1)]=[{title:'Lunch @Shibuya',
 evs[fk(nd.getFullYear(),nd.getMonth(),nd.getDate()+3)]=[{title:'Deadline',time:'All Day',color:'#D1FA94',tag:'締切'}];
 function renderCal(){var Mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];document.getElementById('mlbl').textContent=Mo[vm].toUpperCase()+' '+vy;var g=document.getElementById('cg');g.innerHTML='';['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(function(d){var e=document.createElement('div');e.className='cdn';e.textContent=d;g.appendChild(e);});var fi=new Date(vy,vm,1).getDay(),dim=new Date(vy,vm+1,0).getDate(),dip=new Date(vy,vm,0).getDate();for(var i=fi-1;i>=0;i--)mkC(g,dip-i,'dm',false,false,null,false);for(var d=1;d<=dim;d++){var isT=d===nd.getDate()&&vm===nd.getMonth()&&vy===nd.getFullYear(),isSel=d===sd&&vm===nd.getMonth()&&vy===nd.getFullYear()&&!isT;mkC(g,d,'cm',isT,!!evs[fk(vy,vm,d)],d,isSel);}var r=42-fi-dim;for(var i=1;i<=r;i++)mkC(g,i,'dm',false,false,null,false);renderEvs(sd);}
 function mkC(g,n,cls,isT,hev,dn,isSel){var e=document.createElement('div');e.className='cd '+cls+(isT?' today':'')+(hev?' hev':'')+(isSel?' sel':'');e.textContent=n;if(dn&&cls!=='dm')(function(d){e.onclick=function(){sd=d;renderCal();};})(dn);g.appendChild(e);}
-function renderEvs(day){var Mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],key=fk(vy,vm,day),list=evs[key]||[];document.getElementById('edate').textContent=Mo[vm]+' '+String(day).padStart(2,'0');var el=document.getElementById('elist');if(!list.length){el.innerHTML='<div style="font-size:9px;color:#C4C4C4;padding:4px 0;font-family:DM Mono,monospace;letter-spacing:.06em;">No events</div>';return;}el.innerHTML=list.map(function(ev){return'<div class="ei"><div class="ebar" style="background:'+ev.color+'"></div><div class="einfo"><div class="etitle">'+ev.title+'</div><div class="etime">'+ev.time+'</div></div><span class="etag">'+ev.tag+'</span></div>';}).join('');}
-function cm(dir){vm+=dir;if(vm>11){vm=0;vy++;}if(vm<0){vm=11;vy--;}renderCal();}
+function renderEvs(day){var Mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],key=fk(vy,vm,day),list=evs[key]||[];document.getElementById('edate').textContent=Mo[vm]+' '+String(day).padStart(2,'0');var el=document.getElementById('elist');if(!list.length){el.innerHTML='<div style="font-size:9px;color:#C4C4C4;padding:4px 0;font-family:DM Mono,monospace;letter-spacing:.06em;">No events</div>';return;}el.innerHTML=list.map(function(ev){return'<div class="ei"><div class="ebar" style="background:'+ev.color+'"></div><div class="einfo"><div class="etitle">'+esc(ev.title)+'</div><div class="etime">'+esc(ev.time)+'</div></div><span class="etag">'+esc(ev.tag)+'</span></div>';}).join('');}
+function cm(dir){vm+=dir;if(vm>11){vm=0;vy++;}if(vm<0){vm=11;vy--;}renderCal();if(googleOn)reloadEvents();}
 var tasks=[{id:1,name:'完成させるUIモックアップ',done:false,pri:'high',due:td(0)},{id:2,name:'Google Calendar API',done:false,pri:'high',due:td(1)},{id:3,name:'週次レポートを送付',done:true,pri:'mid',due:td(-1)},{id:4,name:'ドキュメントを更新する',done:false,pri:'low',due:td(3)},{id:5,name:'Notion DB設計',done:false,pri:'mid',due:td(2)}];
 function fmtDue(iso){var d=new Date(iso+'T00:00:00'),t0=new Date(new Date().toDateString()),diff=Math.round((d-t0)/86400000);if(diff===0)return'TODAY';if(diff===1)return'TMR';if(diff===-1)return'YEST';if(diff<0)return'-'+Math.abs(diff)+'D';if(diff<7)return'+'+diff+'D';return(d.getMonth()+1)+'/'+(d.getDate());}
-function renderTasks(){var list=document.getElementById('tlist'),fil=tasks.filter(function(t){return cf2==='todo'?!t.done:cf2==='done'?t.done:true;});if(!fil.length){list.innerHTML='<div class="empty">No tasks</div>';return;}list.innerHTML=fil.map(function(t){var sc=t.done?'ds':t.pri,isOver=!t.done&&t.due<td(0),pn={high:'HIGH',mid:'MID',low:'LOW'}[t.pri];return'<div class="card '+sc+(t.done?' done':'')+'"><div class="ck" onclick="tog('+t.id+')"></div><div class="cbody"><div class="cname">'+t.name+'</div><div class="cmeta"><span class="cdue'+(isOver?' ov':'')+'">'+fmtDue(t.due)+'</span><span class="cpri">'+pn+'</span></div></div><button class="cdel" onclick="del('+t.id+')">×</button></div>';}).join('');}
-function tog(id){tasks=tasks.map(function(t){return t.id===id?Object.assign({},t,{done:!t.done}):t;});renderTasks();}
-function del(id){tasks=tasks.filter(function(t){return t.id!==id;});renderTasks();}
-function clearDone(){tasks=tasks.filter(function(t){return !t.done;});renderTasks();}
-function addTask(){var i=document.getElementById('tinp'),n=i.value.trim();if(!n)return;tasks.unshift({id:Date.now(),name:n,done:false,pri:cp,due:td(0)});i.value='';renderTasks();}
+function renderTasks(){var list=document.getElementById('tlist'),fil=tasks.filter(function(t){return cf2==='todo'?!t.done:cf2==='done'?t.done:true;});if(!fil.length){list.innerHTML='<div class="empty">No tasks</div>';return;}list.innerHTML=fil.map(function(t){var sc=t.done?'ds':t.pri,isOver=!t.done&&t.due<td(0),pn={high:'HIGH',mid:'MID',low:'LOW'}[t.pri];return'<div class="card '+sc+(t.done?' done':'')+'"><div class="ck" onclick="tog(\''+t.id+'\')"></div><div class="cbody"><div class="cname">'+esc(t.name)+'</div><div class="cmeta"><span class="cdue'+(isOver?' ov':'')+'">'+fmtDue(t.due)+'</span><span class="cpri">'+pn+'</span></div></div><button class="cdel" onclick="del(\''+t.id+'\')">×</button></div>';}).join('');}
+function sameId(a,b){return String(a)===String(b);}
+async function tog(id){var cur=tasks.find(function(t){return sameId(t.id,id);});var nv=cur?!cur.done:true;tasks=tasks.map(function(t){return sameId(t.id,id)?Object.assign({},t,{done:nv}):t;});renderTasks();if(notionOn&&window.api){var r=await window.api.tasksToggle(id,nv);if(!r||!r.ok){showToast('Notion更新失敗: '+((r&&r.error)||''));await reloadTasks();}}}
+async function del(id){tasks=tasks.filter(function(t){return !sameId(t.id,id);});renderTasks();if(notionOn&&window.api){var r=await window.api.tasksDelete(id);if(!r||!r.ok){showToast('Notion削除失敗: '+((r&&r.error)||''));await reloadTasks();}}}
+async function clearDone(){var done=tasks.filter(function(t){return t.done;});tasks=tasks.filter(function(t){return !t.done;});renderTasks();if(notionOn&&window.api){for(var i=0;i<done.length;i++){await window.api.tasksDelete(done[i].id);}await reloadTasks();}}
+async function addTask(){var i=document.getElementById('tinp'),n=i.value.trim();if(!n)return;if(notionOn&&window.api){i.value='';var r=await window.api.tasksAdd({name:n,pri:cp,due:td(0)});if(!r||!r.ok){showToast('Notion追加失敗: '+((r&&r.error)||''));}await reloadTasks();}else{tasks.unshift({id:Date.now(),name:n,done:false,pri:cp,due:td(0)});i.value='';renderTasks();}}
 function sf(f,btn){cf2=f;document.querySelectorAll('.fb').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');renderTasks();}
 function sp(p,btn){cp=p;document.querySelectorAll('.pb').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');}
 var pomAct=false,pomRun=false,pomMode='work',WSEC=1500,BSEC=300,CIRC=439.82,pomSec=1500,pomSes=0,pomInt=null;
@@ -252,6 +337,27 @@ function pomReset(){pomStop();pomSec=pomMode==='work'?WSEC:BSEC;updatePom();}
 function pomSetMode(m){pomStop();pomMode=m;pomSec=m==='work'?WSEC:BSEC;document.getElementById('bwork').className='pom-mode-btn'+(m==='work'?' aw':'');document.getElementById('bbreak').className='pom-mode-btn'+(m==='break'?' ab':'');updatePom();}
 function updatePom(){var m=Math.floor(pomSec/60),s=pomSec%60,el=document.getElementById('pdisp');if(el)el.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');var tot=pomMode==='work'?WSEC:BSEC,off=CIRC*(1-pomSec/tot),ring=document.getElementById('pring');if(ring){ring.setAttribute('stroke-dashoffset',off);ring.setAttribute('stroke',pomMode==='work'?'#D1FA94':'#FBC7F9');}var lbl=document.getElementById('plbl');if(lbl)lbl.textContent=pomMode==='work'?'WORK':'BREAK';var dots=document.getElementById('pdots');if(dots)for(var i=0;i<4;i++)dots.children[i].className='pom-dot'+(i<pomSes?' done':'');}
 renderCal();renderTasks();updatePom();
+
+/* ---------------- backend sync (Google Calendar + Notion) ---------------- */
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function showToast(m){var t=document.getElementById('toast');if(!t)return;t.textContent=m;t.style.display='block';clearTimeout(window.__tt);window.__tt=setTimeout(function(){t.style.display='none';},4500);}
+function setMsg(m){var e=document.getElementById('settings-msg');if(e)e.textContent=m||'';}
+function hm(d){return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function fk2(y,m,d){return y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+var EVCOLORS=['#9A9088','#D1FA94','#FBC7F9'];
+function openSettings(){document.getElementById('settings').style.display='flex';setMsg('');updateStatusUI();}
+function closeSettings(){document.getElementById('settings').style.display='none';}
+function updateStatusUI(){var gs=document.getElementById('gStat'),ns=document.getElementById('nStat');if(gs){gs.textContent=googleOn?'接続済み':'未接続';gs.className='settings-stat'+(googleOn?' ok':'');}if(ns){ns.textContent=notionOn?'接続済み':'未接続';ns.className='settings-stat'+(notionOn?' ok':'');}var gl=document.getElementById('gConnLabel');if(gl)gl.textContent=googleOn?'Google Calendar ✓':'Google Calendar';var nl=document.getElementById('nConnLabel');if(nl)nl.textContent=notionOn?'Notion ✓':'Notion';var ab=document.getElementById('addEvBtn');if(ab)ab.style.display=googleOn?'flex':'none';}
+async function refreshBackends(){if(!window.api)return;try{var st=await window.api.configStatus();googleOn=!!st.google;notionOn=!!st.notion;}catch(e){}updateStatusUI();if(notionOn)await reloadTasks();if(googleOn)await reloadEvents();}
+async function reloadTasks(){if(!window.api||!notionOn)return;var r=await window.api.tasksList();if(r&&r.ok){tasks=r.tasks.map(function(t){return{id:t.id,name:t.name,done:t.done,pri:t.pri,due:t.due||td(0)};});renderTasks();}else if(r){showToast('Notion: '+(r.error||'読み込み失敗'));}}
+async function reloadEvents(){if(!window.api||!googleOn)return;var first=new Date(vy,vm,1),last=new Date(vy,vm+1,0,23,59,59);var r=await window.api.listEvents(first.toISOString(),last.toISOString());if(r&&r.ok){evs={};var ci=0;r.events.forEach(function(ev){var d=new Date(ev.startISO);var key=fk(d.getFullYear(),d.getMonth(),d.getDate());var time;if(ev.allDay){time='All Day';}else{var e2=ev.endISO?new Date(ev.endISO):null;time=hm(d)+(e2?'–'+hm(e2):'');}(evs[key]=evs[key]||[]).push({title:ev.title,time:time,color:EVCOLORS[ci++%EVCOLORS.length],tag:ev.allDay?'終日':''});});renderCal();}else if(r){showToast('Calendar: '+(r.error||'読み込み失敗'));}}
+async function gConnect(){if(!window.api)return;setMsg('ブラウザを開きます。許可してください...');await window.api.googleSaveCreds(document.getElementById('gClientId').value,document.getElementById('gClientSecret').value,document.getElementById('gCalId').value);var r=await window.api.googleConnect();if(r&&r.ok){googleOn=true;updateStatusUI();setMsg('接続しました');showToast('Googleカレンダーに接続しました');await reloadEvents();}else{setMsg('失敗: '+((r&&r.error)||'不明なエラー'));}}
+async function gDisconnect(){if(!window.api)return;await window.api.googleDisconnect();googleOn=false;updateStatusUI();setMsg('解除しました');}
+async function nSave(){if(!window.api)return;setMsg('接続中...');var r=await window.api.notionSave(document.getElementById('nToken').value,document.getElementById('nDbId').value);if(r&&r.ok){notionOn=true;updateStatusUI();setMsg('接続しました');showToast('Notionに接続しました');await reloadTasks();}else{setMsg('失敗: '+((r&&r.error)||'不明なエラー'));}}
+async function nDisconnect(){if(!window.api)return;await window.api.notionDisconnect();notionOn=false;updateStatusUI();setMsg('解除しました');}
+function toggleAddEv(){var f=document.getElementById('evForm');f.style.display=(f.style.display==='none'||!f.style.display)?'flex':'none';if(f.style.display==='flex')document.getElementById('evTitle').focus();}
+async function submitEvent(){if(!googleOn||!window.api){showToast('先にGoogleカレンダーを接続してください');return;}var title=document.getElementById('evTitle').value.trim();if(!title)return;var st=document.getElementById('evStart').value,en=document.getElementById('evEnd').value,ev;if(st){var sp=st.split(':'),s=new Date(vy,vm,sd,+sp[0],+sp[1]),e;if(en){var ep=en.split(':');e=new Date(vy,vm,sd,+ep[0],+ep[1]);}else{e=new Date(s.getTime()+3600000);}ev={title:title,startISO:s.toISOString(),endISO:e.toISOString(),allDay:false};}else{ev={title:title,date:fk2(vy,vm,sd),allDay:true};}var r=await window.api.createEvent(ev);if(r&&r.ok){document.getElementById('evTitle').value='';document.getElementById('evStart').value='';document.getElementById('evEnd').value='';toggleAddEv();showToast('予定を追加しました');await reloadEvents();}else{showToast('追加失敗: '+((r&&r.error)||''));}}
+refreshBackends();
 </script>
 </body>
 </html>
